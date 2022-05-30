@@ -9,6 +9,8 @@ let s:has_ghost_text = has('nvim-0.6') && exists('*nvim_buf_get_mark')
 
 let s:hlgroup = 'CopilotSuggestion'
 
+let s:filters = []
+
 if len($XDG_CONFIG_HOME)
   let s:config_root = $XDG_CONFIG_HOME
 elseif has('win32')
@@ -268,6 +270,15 @@ function! s:HideDuringCompletion() abort
   return get(g:, 'copilot_hide_during_completion', 1)
 endfunction
 
+function! s:ApplyFilters(result) abort
+  let filtered = a:result
+  for l:Filter in s:filters
+    let _filtered = l:Filter(filtered)
+    let filtered = type(_filtered) == type([]) ? _filtered : ['', 0, 0, '']
+  endfor
+  return filtered
+endfunction
+
 function! s:SuggestionTextWithAdjustments() abort
   try
     if mode() !~# '^[iR]' || (s:HideDuringCompletion() && pumvisible()) || !s:dest || !exists('b:_copilot.suggestions')
@@ -287,14 +298,14 @@ function! s:SuggestionTextWithAdjustments() abort
     let typed_after = strpart(line, offset)
     let delete = strchars(typed_after)
     let uuid = get(choice, 'uuid', '')
-    if substitute(typed_after, '^\s\+', '') ==# substitute(choice.text, '^\s\+', '')
+    if substitute(typed_after, '^\s\+', '', '') ==# substitute(choice.text, '^\s\+', '', '')
       return ['', 0, 0, '']
     elseif typed_before ==# strpart(choice.text, 0, offset)
-      return [strpart(choice.text, offset), 0, delete, uuid]
+      return s:ApplyFilters([strpart(choice.text, offset), 0, delete, uuid])
     elseif typed_before =~# '^\s*$'
       let leading = matchstr(choice.text, '^\s\+')
       if strpart(typed_before, 0, len(leading)) == leading
-        return [strpart(choice.text, len(leading)), len(typed_before) - len(leading), delete, uuid]
+        return s:ApplyFilters([strpart(choice.text, len(leading)), len(typed_before) - len(leading), delete, uuid])
       endif
     endif
   catch
@@ -932,4 +943,8 @@ function! copilot#Command(line1, line2, range, bang, mods, arg) abort
   catch /^Copilot:/
     return 'echoerr ' . string(v:exception)
   endtry
+endfunction
+
+function! copilot#AddFilter(filter) abort
+  let s:filters += [a:filter]
 endfunction
