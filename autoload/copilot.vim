@@ -203,15 +203,18 @@ function! s:SuggestionTextWithAdjustments() abort
       call copilot#logger#Warn('unexpected range ' . json_encode(choice.range))
       return ['', 0, 0, '']
     endif
-    let typed = strpart(line, 0, offset)
-    let delete = strchars(strpart(line, offset))
+    let typed_before = strpart(line, 0, offset)
+    let typed_after = strpart(line, offset)
+    let delete = strchars(typed_after)
     let uuid = get(choice, 'uuid', '')
-    if typed ==# strpart(choice.text, 0, offset)
+    if substitute(typed_after, '^\s\+', '', '') ==# substitute(choice.text, '^\s\+', '', '')
+      return ['', 0, 0, '']
+    elseif typed_before ==# strpart(choice.text, 0, offset)
       return [strpart(choice.text, offset), 0, delete, uuid]
-    elseif typed =~# '^\s*$'
+    elseif typed_before =~# '^\s*$'
       let leading = matchstr(choice.text, '^\s\+')
-      if strpart(typed, 0, len(leading)) == leading
-        return [strpart(choice.text, len(leading)), len(typed) - len(leading), delete, uuid]
+      if strpart(typed_before, 0, len(leading)) == leading
+        return [strpart(choice.text, len(leading)), len(typed_before) - len(leading), delete, uuid]
       endif
     endif
   catch
